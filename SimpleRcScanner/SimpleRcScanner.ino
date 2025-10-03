@@ -10,7 +10,7 @@ static int interruptPin = 0;
 
 void setup() {
   interruptPin = digitalPinToInterrupt(receiverPin);
-  Serial.begin(9600); 
+  Serial.begin(115200); 
   attachInterrupt(interruptPin, handleInterrupt, CHANGE);
   pinMode(13, OUTPUT);
   digitalWrite(13, LOW);
