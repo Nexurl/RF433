@@ -12,6 +12,8 @@
 // Connect receiver data pin to Arduino pin 2
 #include <Arduino.h>
 #define RX_PIN 2
+#define TX_PIN 3
+#define EN_PIN 10
 
 // Protocol parameters
 const unsigned int BIT_DURATION = 500; // microseconds per bit
@@ -21,6 +23,10 @@ const byte START_BYTE = 0xAA;
 void setup() {
   Serial.begin(115200);
   pinMode(RX_PIN, INPUT);
+  pinMode(TX_PIN, OUTPUT);
+  pinMode(EN_PIN, OUTPUT);
+  digitalWrite(TX_PIN, LOW);
+  digitalWrite(EN_PIN, LOW);
 }
 
 // Wait for a HIGH pulse of at least PREAMBLE_DURATION
