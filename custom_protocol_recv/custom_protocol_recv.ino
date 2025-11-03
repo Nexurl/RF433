@@ -17,7 +17,7 @@
 
 // Protocol parameters
 const unsigned int BIT_DURATION = 500; // microseconds per bit
-const unsigned int PREAMBLE_DURATION = 3000; // microseconds (long HIGH)
+const unsigned int PREAMBLE_DURATION = 8000; // microseconds (long HIGH)
 const byte START_BYTE = 0xAA;
 
 void setup() {
