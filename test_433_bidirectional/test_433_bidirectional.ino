@@ -2,6 +2,8 @@
 #include <SPI.h> // Not required, but included for compatibility
 
 // Create ASK object
+// default pin configuration:
+// RH_ASK(uint16_t speed = 2000, uint8_t rxPin = 11, uint8_t txPin = 12, uint8_t pttPin = 10, bool pttInverted = false);
 RH_ASK rf_driver;
 
 void setup()

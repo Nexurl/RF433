@@ -1,5 +1,5 @@
 #define RX_PIN 2
-#define TX_PIN 12
+#define TX_PIN 3
 #define EN_PIN 10
 
 void setup() {
