@@ -9,7 +9,6 @@ File myFile;
 
 void setup() {
   Serial.begin(9600);
-
   mySwitch.enableReceive(0);  // Receiver on interrupt 0 => that is pin #2
   mySwitch.enableTransmit(3);
 
@@ -18,35 +17,120 @@ void setup() {
     delay(10000);
   }
 
-  if (!SD.exists("keys")) {
+  if (SD.exists("keys/location.txt")) {
+    send_keys_from_file(SD.open("keys/location.txt"));
+    SD.remove("keys/location.txt");
+  }
+
+  if (!SD.exists("key")) {
     Serial.println("Creating keys directory...");
     SD.mkdir("keys");
   }
 
-  /*File exempleFile = SD.open("keys/exemple.txt", FILE_WRITE);
-  exempleFile.println("011011111000010000101000");
-  exempleFile.close();*/
-
-  SD_PrintDirectory(SD.open("/"), 1);
-
-  //mySwitch.send("011011111000010000101000");
+  Serial.println("Creating keys/location.txt file...");
+  File locationFile = SD.open("keys/location.txt", O_WRITE | O_CREAT);
+  locationFile.close();
+  
+  SD_PrintDirectory(SD.open("/"), 2);
 
   Serial.println("Setup complete.");
 }
 
 void loop() {
   if (mySwitch.available()) {
+    unsigned long decimalValue = mySwitch.getReceivedValue();
+    char binaryBuffer[25];  // 24 bits + null terminator
     
-    Serial.print("Received ");
-    Serial.print( mySwitch.getReceivedValue() );
+    decimalToBinaryString(decimalValue, binaryBuffer);
+    
+    Serial.print("Received Decimal: ");
+    Serial.print(decimalValue);
+    Serial.print(" / Binary: ");
+    Serial.print(binaryBuffer);
     Serial.print(" / ");
-    Serial.print( mySwitch.getReceivedBitlength() );
+    Serial.print(mySwitch.getReceivedBitlength());
     Serial.print("bit ");
     Serial.print("Protocol: ");
-    Serial.println( mySwitch.getReceivedProtocol() );
+    Serial.println(mySwitch.getReceivedProtocol());
+
+    // Store the code (including duplicates)
+    storeCode("keys/location.txt", binaryBuffer);
 
     mySwitch.resetAvailable();
+  }
+}
+
+
+// Convert decimal to binary string (24 bits)
+void decimalToBinaryString(unsigned long value, char* buffer) {
+  buffer[24] = '\0';  // Null terminate the string
+  for(int i = 23; i >= 0; i--) {
+    buffer[i] = (value & 1) ? '1' : '0';
+    value = value >> 1;
+  }
+}
+
+// Convert binary string to decimal
+unsigned long binaryStringToDecimal(const char* binary) {
+  unsigned long result = 0;
+  while(*binary) {
+    result = (result << 1) + (*binary++ - '0');
+  }
+  return result;
+}
+
+bool isCodeInFile(const char* filename, const char* codeToCheck) {
+  File file = SD.open(filename, O_READ);
+  if (!file) {
+    return false;  // File doesn't exist, so code can't be in it
+  }
+
+  char buffer[25];  // 24 bits + null terminator
+  buffer[24] = '\0';  // Always null terminate
+  
+  while (file.available()) {
+    // Read exactly 24 characters
+    int bytesRead = file.read((uint8_t*)buffer, 24);
+    if (bytesRead == 24) {
+      if (strcmp(buffer, codeToCheck) == 0) {
+        file.close();
+        return true;  // Found a match
+      }
+      // Skip the newline character
+      if (file.available()) {
+        file.read();
+      }
+    }
+  }
+  
+  file.close();
+  return false;
+}
+
+void storeCode(const char* filename, const char* code) {
+  File file = SD.open(filename, O_WRITE | O_APPEND);
+  if (file) {
+    // Write exactly 24 bits
+    for(int i = 0; i < 24; i++) {
+      file.write(code[i]);
+    }
+    file.write('\n');  // Single newline character
+    file.close();
     
+    Serial.print("Code stored in ");
+    Serial.print(filename);
+    Serial.print(": ");
+    Serial.println(code);
+  } else {
+    Serial.println("Error opening file for writing");
+  }
+}
+
+void storeUniqueCode(const char* filename, const char* code) {
+  if (!isCodeInFile(filename, code)) {
+    storeCode(filename, code);
+  } else {
+    Serial.println("Code already exists in file");
   }
 }
 
@@ -107,18 +191,42 @@ void SD_PrintDirectory(File dir, int numTabs) {
 
 }
 
-void keys_from_file(){
-  File keyFile = SD.open("keys/exemple.txt");
+void send_keys_from_file(File keyFile) {
   if (keyFile) {
-    Serial.println("exemple.txt:");
-    // read from the file until there's nothing else in it:
+    char buffer[33];  // 32 bits + null terminator
+    int bufferIndex = 0;
+    
+    Serial.println("Reading and sending codes from exemple.txt:");
+    
     while (keyFile.available()) {
-      Serial.write(keyFile.read());
+      char c = keyFile.read();
+      
+      if (c == '\n' || c == '\r') {
+        if (bufferIndex > 0) {  // If we have collected some characters
+          buffer[bufferIndex] = '\0';  // Null terminate the string
+          Serial.print("Sending code: ");
+          Serial.println(buffer);
+          mySwitch.send(buffer);
+          bufferIndex = 0;  // Reset for next line
+          delay(1000);  // Wait 1 second between transmissions
+        }
+      } else if (bufferIndex < 24) {  // Prevent buffer overflow
+        buffer[bufferIndex] = c;
+        bufferIndex++;
+      }
     }
-    // close the file:
+    
+    // Handle the last line if it doesn't end with a newline
+    if (bufferIndex > 0) {
+      buffer[bufferIndex] = '\0';
+      Serial.print("Sending code: ");
+      Serial.println(buffer);
+      mySwitch.send(buffer);
+    }
+    
     keyFile.close();
+    Serial.println("Finished sending all codes.");
   } else {
-    // if the file didn't open, print an error:
-    Serial.println("error opening file");
+    Serial.println("Error opening file");
   }
 }
