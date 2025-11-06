@@ -55,6 +55,10 @@ static bool waitForPreambleAndSync() {
 
   // First, accumulate at least PREAMBLE_MIN_CYCLES of 1T/1T
   while ((micros() - start) < timeout && cycles < PREAMBLE_MIN_CYCLES) {
+    Serial.print("Diff de timing ");
+    Serial.print(micros() - start);
+    Serial.print(" Nombre de cycles : ");
+    Serial.println(cycles);
     if (!readPulsePair(6000, highDur, lowDur)) continue;
     if (inRange(highDur, T_US) && inRange(lowDur, T_US)) {
       cycles++;
@@ -131,6 +135,7 @@ void setup() {
   pinMode(EN_PIN, OUTPUT);
   digitalWrite(TX_PIN, LOW);
   digitalWrite(EN_PIN, LOW);
+  Serial.print("J'écoute !");
 }
 
 void loop() {

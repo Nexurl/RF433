@@ -84,10 +84,12 @@ static void sendPacket(uint8_t seq, const uint8_t* payload, uint8_t payloadLen) 
 }
 
 void setup() {
+  Serial.begin(115200);
   pinMode(TX_PIN, OUTPUT);
   digitalWrite(TX_PIN, LOW);
   pinMode(EN_PIN, OUTPUT);
   digitalWrite(EN_PIN, LOW);
+  Serial.println("Je parle !");
 }
 
 void loop() {
