@@ -14,6 +14,7 @@ void setup() {
   Serial.begin(9600);
 
   mySwitch.enableReceive(0);  // Receiver on interrupt 0 => that is pin #2
+  mySwitch.enableTransmit(3);
 
   while (!SD_Init()) {
     Serial.println("Trying again in 10 seconds...");
@@ -23,8 +24,15 @@ void setup() {
     Serial.println("Creating keys directory...");
     SD.mkdir("keys");
   }
-  SD_Info();
 
+  /*File exampleFile;
+  Serial.println("Creating example.txt...");
+  exampleFile = SD.open("keys/exampe.txt", FILE_WRITE);
+  exampleFile.close();*/
+  
+  mySwitch.send("011011111000010000101000");
+
+  SD_Info();
   Serial.println("Setup complete.");
 }
 
