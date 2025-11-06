@@ -31,8 +31,18 @@ static uint8_t crc8(const uint8_t* data, uint8_t len) {
 }
 
 static inline bool inRange(unsigned long v, unsigned long target) {
+  Serial.print("v = ");
+  Serial.println(v);
+  // Serial.print("target = ");
+  // Serial.println(target);
   unsigned long low = (unsigned long)(target * (1.0f - TOL));
+  // Serial.print("low = ");
+  // Serial.println(low);
   unsigned long high = (unsigned long)(target * (1.0f + TOL));
+  // Serial.print("high = ");
+  // Serial.println(high);
+    Serial.print("Is in range ? --> ");
+    Serial.println(v >= low && v <= high);
   return v >= low && v <= high;
 }
 
@@ -40,8 +50,13 @@ static inline bool inRange(unsigned long v, unsigned long target) {
 static bool readPulsePair(unsigned long timeout_us, unsigned long &highDur, unsigned long &lowDur) {
   // Measure one HIGH pulse then one LOW pulse
   highDur = pulseIn(RX_PIN, HIGH, timeout_us);
-  if (highDur == 0) return false;
+  Serial.print("highDur = ");
+  Serial.print(highDur);
   lowDur = pulseIn(RX_PIN, LOW, timeout_us);
+  Serial.print("   /   ");
+  Serial.print("lowDur = ");
+  Serial.println(highDur);
+  if (highDur == 0) return false;
   if (lowDur == 0) return false;
   return true;
 }
@@ -49,7 +64,7 @@ static bool readPulsePair(unsigned long timeout_us, unsigned long &highDur, unsi
 // Wait for preamble (a run of ~1T/1T pairs) followed by sync (3T/3T)
 static bool waitForPreambleAndSync() {
   unsigned long highDur = 0, lowDur = 0;
-  uint8_t cycles = 0;
+  uint8_t cycles = 1;
   unsigned long timeout = 100000; // 100ms overall attempt
   unsigned long start = micros();
 
@@ -57,8 +72,11 @@ static bool waitForPreambleAndSync() {
   while ((micros() - start) < timeout && cycles < PREAMBLE_MIN_CYCLES) {
     if (!readPulsePair(6000, highDur, lowDur)) continue;
     if (inRange(highDur, T_US) && inRange(lowDur, T_US)) {
+      Serial.print("cycle = ");
+      Serial.println(cycles);
       cycles++;
     } else {
+      Serial.println("RESET CYCLES");
       cycles = 0; // reset if broken
     }
   }
