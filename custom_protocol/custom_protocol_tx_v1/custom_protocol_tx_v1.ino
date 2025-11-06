@@ -30,7 +30,7 @@ static inline void txHighLow(unsigned int high_us, unsigned int low_us) {
 
 static void sendPreambleAndSync() {
   // Optional: enable TX if using a power/enable pin
-  // digitalWrite(EN_PIN, HIGH);
+  digitalWrite(EN_PIN, HIGH);
   // Preamble: alternating 1T/1T to let AGC settle
   for (uint8_t i = 0; i < PREAMBLE_CYCLES; i++) {
     txHighLow(T_US, T_US);
@@ -84,10 +84,12 @@ static void sendPacket(uint8_t seq, const uint8_t* payload, uint8_t payloadLen) 
 }
 
 void setup() {
+  Serial.begin(115200);
   pinMode(TX_PIN, OUTPUT);
   digitalWrite(TX_PIN, LOW);
   pinMode(EN_PIN, OUTPUT);
   digitalWrite(EN_PIN, LOW);
+  Serial.println("Je parle !");
 }
 
 void loop() {
