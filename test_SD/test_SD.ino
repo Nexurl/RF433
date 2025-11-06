@@ -29,13 +29,7 @@ void setup() {
     SD.mkdir("keys");
   }
 
-  File exampleFile;
-  Serial.println("Creating example.txt...");
-  exampleFile = SD.open("keys/example.txt", FILE_WRITE);
-  exampleFile.close();
-
-  SD.remove("example.txt");
-
+  SD_FileTest();
   SD_Info();
 }
 
@@ -168,30 +162,31 @@ void SD_Info() {
 
 void SD_FileTest() {
   
-  if (SD.exists("example.txt")) {
-    Serial.println("example.txt exists.");
+  if (SD.exists("keys/example.txt")) {
+    Serial.println("keys/example.txt exists.");
   } else {
-    Serial.println("example.txt doesn't exist.");
+    Serial.println("keys/example.txt doesn't exist.");
   }
   
   File exampleFile;
-  Serial.println("Creating example.txt...");
-  exampleFile = SD.open("example.txt", FILE_WRITE);
+  Serial.println("Creating keys/example.txt...");
+  exampleFile = SD.open("keys/example.txt", FILE_WRITE);
   exampleFile.close();
 
-  if (SD.exists("example.txt")) {
-    Serial.println("example.txt exists.");
+  if (SD.exists("keys/example.txt")) {
+    Serial.println("keys/example.txt exists.");
   } else {
-    Serial.println("example.txt doesn't exist.");
+    Serial.println("keys/example.txt doesn't exist.");
   }
 
-  Serial.println("Removing example.txt...");
+  Serial.println("Removing keys/example.txt...");
+  SD.remove("keys/example.txt");
   
 
-  if (SD.exists("example.txt")) {
-    Serial.println("example.txt exists.");
+  if (SD.exists("keys/example.txt")) {
+    Serial.println("keys/example.txt exists.");
   } else {
-    Serial.println("example.txt doesn't exist.");
+    Serial.println("keys/example.txt doesn't exist.");
   }
 
 }

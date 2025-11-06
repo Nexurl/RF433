@@ -1,14 +1,11 @@
-#include <RCSwitch.h>
 #include <SPI.h>
 #include <SD.h>
+#include <RCSwitch.h>
 
-
-Sd2Card card;
-SdVolume volume;
-SdFile root;
-const int chipSelect = 10;
+const int chipSelect = 4;
 
 RCSwitch mySwitch = RCSwitch();
+File myFile;
 
 void setup() {
   Serial.begin(9600);
@@ -20,25 +17,24 @@ void setup() {
     Serial.println("Trying again in 10 seconds...");
     delay(10000);
   }
+
   if (!SD.exists("keys")) {
     Serial.println("Creating keys directory...");
     SD.mkdir("keys");
   }
 
-  /*File exampleFile;
-  Serial.println("Creating example.txt...");
-  exampleFile = SD.open("keys/exampe.txt", FILE_WRITE);
-  exampleFile.close();*/
-  
-  mySwitch.send("011011111000010000101000");
+  /*File exempleFile = SD.open("keys/exemple.txt", FILE_WRITE);
+  exempleFile.println("011011111000010000101000");
+  exempleFile.close();*/
 
-  SD_Info();
+  SD_PrintDirectory(SD.open("/"), 1);
+
+  //mySwitch.send("011011111000010000101000");
+
   Serial.println("Setup complete.");
 }
 
-
 void loop() {
-  
   if (mySwitch.available()) {
     
     Serial.print("Received ");
@@ -50,10 +46,9 @@ void loop() {
     Serial.println( mySwitch.getReceivedProtocol() );
 
     mySwitch.resetAvailable();
+    
   }
 }
-
-
 
 
 bool SD_Init() {
@@ -63,7 +58,7 @@ bool SD_Init() {
 
   // since we're just testing if the card is working!
 
-  if (!card.init(SPI_HALF_SPEED, chipSelect) or !SD.begin(chipSelect)) {
+  if (!SD.begin(chipSelect)) {
     Serial.println();
     Serial.println("Initialization failed. Things to check:");
     Serial.println("* is a card inserted?");
@@ -82,99 +77,48 @@ bool SD_Init() {
   }
 }
 
-void SD_Info() {
-  // print the type of card
+void SD_PrintDirectory(File dir, int numTabs) {
+  while (true) {
+    File entry =  dir.openNextFile();
 
-  Serial.println();
-
-  Serial.print("Card type:         ");
-
-  switch (card.type()) {
-
-    case SD_CARD_TYPE_SD1:
-
-      Serial.println("SD1");
-
+    if (!entry) {
+      // no more files
       break;
+    }
 
-    case SD_CARD_TYPE_SD2:
+    for (uint8_t i = 0; i < numTabs; i++) {
+      Serial.print('\t');
+    }
 
-      Serial.println("SD2");
+    Serial.print(entry.name());
 
-      break;
+    if (entry.isDirectory()) {
+      Serial.println("/");
+      SD_PrintDirectory(entry, numTabs + 1);
 
-    case SD_CARD_TYPE_SDHC:
-
-      Serial.println("SDHC");
-
-      break;
-
-    default:
-
-      Serial.println("Unknown");
-
+    } else {
+      // files have sizes, directories do not
+      Serial.print("\t\t");
+      Serial.println(entry.size(), DEC);
+    }
+    
+    entry.close();
   }
 
-  // Now we will try to open the 'volume'/'partition' - it should be FAT16 or FAT32
+}
 
-  if (!volume.init(card)) {
-
-    Serial.println("Could not find FAT16/FAT32 partition.\nMake sure you've formatted the card");
-
-    while (1);
-
+void keys_from_file(){
+  File keyFile = SD.open("keys/exemple.txt");
+  if (keyFile) {
+    Serial.println("exemple.txt:");
+    // read from the file until there's nothing else in it:
+    while (keyFile.available()) {
+      Serial.write(keyFile.read());
+    }
+    // close the file:
+    keyFile.close();
+  } else {
+    // if the file didn't open, print an error:
+    Serial.println("error opening file");
   }
-
-  Serial.print("Clusters:          ");
-
-  Serial.println(volume.clusterCount());
-
-  Serial.print("Blocks x Cluster:  ");
-
-  Serial.println(volume.blocksPerCluster());
-
-  Serial.print("Total Blocks:      ");
-
-  Serial.println(volume.blocksPerCluster() * volume.clusterCount());
-
-  Serial.println();
-
-  // print the type and size of the first FAT-type volume
-
-  uint32_t volumesize;
-
-  Serial.print("Volume type is:    FAT");
-
-  Serial.println(volume.fatType(), DEC);
-
-  volumesize = volume.blocksPerCluster();    // clusters are collections of blocks
-
-  volumesize *= volume.clusterCount();       // we'll have a lot of clusters
-
-  volumesize /= 2;                           // SD card blocks are always 512 bytes (2 blocks are 1KB)
-
-  Serial.print("Volume size (Kb):  ");
-
-  Serial.println(volumesize);
-
-  Serial.print("Volume size (Mb):  ");
-
-  volumesize /= 1024;
-
-  Serial.println(volumesize);
-
-  Serial.print("Volume size (Gb):  ");
-
-  Serial.println((float)volumesize / 1024.0);
-
-  Serial.println("\nFiles found on the card (name, date and size in bytes): ");
-
-  root.openRoot(volume);
-
-  // list all files in the card with date and size
-  root.ls(LS_R | LS_DATE | LS_SIZE);
-
-  root.close();
-
-  Serial.println();
 }
