@@ -11,7 +11,7 @@ SdFile root;
 // change this to match your SD shield or module;
 // Default SPI on Uno and Nano: pin 10
 
-const int chipSelect = 10;
+const int chipSelect = 4;
 
 void setup() {
 
@@ -162,31 +162,31 @@ void SD_Info() {
 
 void SD_FileTest() {
   
-  if (SD.exists("keys/example.txt")) {
-    Serial.println("keys/example.txt exists.");
+  if (SD.exists("keys/location.txt")) {
+    Serial.println("keys/location.txt exists.");
   } else {
-    Serial.println("keys/example.txt doesn't exist.");
+    Serial.println("keys/location.txt doesn't exist.");
   }
   
   File exampleFile;
-  Serial.println("Creating keys/example.txt...");
-  exampleFile = SD.open("keys/example.txt", FILE_WRITE);
+  Serial.println("Creating keys/location.txt...");
+  exampleFile = SD.open("keys/location.txt", FILE_WRITE);
   exampleFile.close();
 
-  if (SD.exists("keys/example.txt")) {
-    Serial.println("keys/example.txt exists.");
+  if (SD.exists("keys/location.txt")) {
+    Serial.println("keys/location.txt exists.");
   } else {
-    Serial.println("keys/example.txt doesn't exist.");
+    Serial.println("keys/location.txt doesn't exist.");
   }
 
-  Serial.println("Removing keys/example.txt...");
-  SD.remove("keys/example.txt");
+  Serial.println("Removing keys/location.txt...");
+  //SD.remove("keys/location.txt");
   
 
-  if (SD.exists("keys/example.txt")) {
-    Serial.println("keys/example.txt exists.");
+  if (SD.exists("keys/location.txt")) {
+    Serial.println("keys/location.txt exists.");
   } else {
-    Serial.println("keys/example.txt doesn't exist.");
+    Serial.println("keys/location.txt doesn't exist.");
   }
 
 }
