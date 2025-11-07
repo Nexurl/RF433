@@ -3,7 +3,8 @@
 // RX: pin 2
 
 #define RX_PIN 2
-#define SPEED 2000  // bits per second
+#define lo8(x) ((x)&0xff) 
+#define hi8(x) ((x)>>8)
 
 // 6-to-4 bit decoding table (reverse of encoder)
 const uint8_t symbols[16] = {
@@ -58,11 +59,13 @@ void setupTimer() {
 }
 
 // CRC-CCITT calculation
-uint16_t crc_ccitt_update(uint16_t crc, uint8_t data) {
-    data ^= crc & 0xff;
+uint16_t crc_ccitt_update (uint16_t crc, uint8_t data)
+{
+    data ^= lo8 (crc);
     data ^= data << 4;
-    return ((((uint16_t)data << 8) | ((crc >> 8) & 0xff)) ^
-            (uint8_t)(data >> 4) ^ ((uint16_t)data << 3));
+    
+    return ((((uint16_t)data << 8) | hi8 (crc)) ^ (uint8_t)(data >> 4) 
+	    ^ ((uint16_t)data << 3));
 }
 
 // Convert 6-bit symbol to 4-bit nybble
@@ -80,9 +83,13 @@ bool validateRxBuf() {
     
     // Calculate CRC over entire buffer
     uint16_t crc = 0xffff;
-    for (uint8_t i = 0; i < rxBufLen; i++) {
+    for (uint8_t i = 1; i < rxBufLen; i++) {
         crc = crc_ccitt_update(crc, rxBuf[i]);
     }
+    Serial.println();
+    Serial.println(rxBufLen);
+    Serial.println(crc);
+    Serial.println(0xf0b8);
     
     // Valid CRC should result in 0xf0b8
     return (crc == 0xf0b8);
@@ -123,6 +130,9 @@ ISR(TIMER1_COMPA_vect) {
                 uint8_t thisByte = (symbol_6to4(rxBits & 0x3f) << 4) | 
                                    symbol_6to4(rxBits >> 6);
                 
+                // Serial.print("byte : ");
+                Serial.print(thisByte, HEX);
+
                 if (rxBufLen == 0) {
                     // First byte is the count
                     rxCount = thisByte;
@@ -170,7 +180,7 @@ void loop() {
             Serial.print(" bytes): ");
             
             // Skip length byte, print payload (excluding 2-byte CRC at end)
-            for (uint8_t i = 1; i < len - 2; i++) {
+            for (uint8_t i = 1; i < len; i++) {//- 2; i++) {
                 if (buf[i] >= 32 && buf[i] < 127) {
                     Serial.print((char)buf[i]);
                 } else {
