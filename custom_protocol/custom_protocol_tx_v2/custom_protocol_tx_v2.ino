@@ -2,9 +2,15 @@
 // Based on RadioHead RH_ASK principles but simplified for Arduino UNO
 // TX: pin 3, EN_TX: pin 10
 
+#include <Arduino.h>
+
 #define TX_PIN 3
 #define EN_TX_PIN 10
 #define SPEED 2000  // bits per second
+
+// CRC helpers
+#define lo8(x) ((x)&0xff) 
+#define hi8(x) ((x)>>8)
 
 // 4-to-6 bit encoding table
 // Each symbol has 3 ones and 3 zeros for DC balance
@@ -59,6 +65,15 @@ uint16_t crc_ccitt_update(uint16_t crc, uint8_t data) {
             (uint8_t)(data >> 4) ^ ((uint16_t)data << 3));
 }
 
+uint16_t RHcrc_ccitt_update (uint16_t crc, uint8_t data)
+{
+    data ^= lo8 (crc);
+    data ^= data << 4;
+    
+    return ((((uint16_t)data << 8) | hi8 (crc)) ^ (uint8_t)(data >> 4) 
+	    ^ ((uint16_t)data << 3));
+}
+
 // Encode a byte as two 6-bit symbols
 void encodeByte(uint8_t b) {
     txBuf[txBufLen++] = symbols[b >> 4];     // High nybble
@@ -90,18 +105,24 @@ bool send(const uint8_t* message, uint8_t len) {
     
     // Calculate CRC
     uint16_t crc = 0xffff;
-    crc = crc_ccitt_update(crc, totalLen);
+    crc = RHcrc_ccitt_update(crc, totalLen);
     
     // Encode message
     for (uint8_t i = 0; i < len; i++) {
         encodeByte(message[i]);
-        crc = crc_ccitt_update(crc, message[i]);
+        crc = RHcrc_ccitt_update(crc, message[i]);
     }
     
     // Encode CRC (low byte first)
-    encodeByte(crc & 0xff);
+    // encodeByte(crc & 0xff);
     encodeByte(crc >> 8);
+    encodeByte(crc & 0xff);
     
+    // DEBUG
+    Serial.print("CRC :");
+    Serial.print(crc, HEX);
+    Serial.println();
+
     // Start transmission
     noInterrupts();
     txIndex = 0;
@@ -111,6 +132,14 @@ bool send(const uint8_t* message, uint8_t len) {
     digitalWrite(EN_TX_PIN, HIGH);  // Enable transmitter
     interrupts();
     
+    // DEBUG
+    Serial.print("Entire txBuf :");
+    for (uint16_t i = 0; i < txBufLen; i++) {
+        Serial.print(txBuf[i], HEX);
+        Serial.print(" ");
+    }
+    Serial.println();
+
     return true;
 }
 
@@ -143,22 +172,28 @@ ISR(TIMER1_COMPA_vect) {
 
 void loop() {
     static uint32_t lastSend = 0;
-    static uint8_t counter = 0;
+    static uint8_t counter = 33;
     
     if (millis() - lastSend >= 1000 && !transmitting) {
         // Send a test message every second
         uint8_t message[10];
-        message[0] = 0xAA;  // Test pattern
+        message[0] = 0x42;  // Test pattern
+        if (counter > 124) counter = 33;
         message[1] = counter++;
         
-        sprintf((char*)&message[2], "TEST%02d", counter % 100);
+        sprintf((char*)&message[2], "TEST%02d", counter);
         
-        if (send(message, 10)) {
+        char displaymessage[8];
+        if (send(message, 8)) {
+            // DEBUG
             Serial.print("Sending: ");
-            for (int i = 0; i < 10; i++) {
+            for (int i = 0; i < 8; i++) {
                 Serial.print(message[i], HEX);
                 Serial.print(" ");
+                displaymessage[i] = message[i];
             }
+            Serial.print(" | ");
+            Serial.print(displaymessage);
             Serial.println();
         }
         

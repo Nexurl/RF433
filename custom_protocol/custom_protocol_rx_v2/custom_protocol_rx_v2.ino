@@ -2,6 +2,8 @@
 // Based on RadioHead RH_ASK principles but simplified for Arduino UNO
 // RX: pin 2
 
+#include <Arduino.h>
+
 #define RX_PIN 2
 #define lo8(x) ((x)&0xff) 
 #define hi8(x) ((x)>>8)
