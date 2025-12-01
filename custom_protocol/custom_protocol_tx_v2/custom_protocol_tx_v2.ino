@@ -107,18 +107,17 @@ bool send(const uint8_t* message, uint8_t len) {
     // Calculate CRC
     uint16_t crc = 0xffff;
     crc = RHcrc_ccitt_update(crc, totalLen);
-    
+
     // Encode message
     for (uint8_t i = 0; i < len; i++) {
         encodeByte(message[i]);
         crc = RHcrc_ccitt_update(crc, message[i]);
     }
-    
-    // Encode CRC (low byte first)
-    // encodeByte(crc & 0xff);
-    encodeByte(crc >> 8);
+    // Invert CRC (ones' complement)
+    crc = ~crc;
+    // Encode CRC (low byte first, then high byte)
     encodeByte(crc & 0xff);
-    
+    encodeByte(crc >> 8);
     // DEBUG
     Serial.print("CRC :");
     Serial.print(crc, HEX);
@@ -132,7 +131,7 @@ bool send(const uint8_t* message, uint8_t len) {
     transmitting = true;
     digitalWrite(EN_TX_PIN, HIGH);  // Enable transmitter
     interrupts();
-    
+
     // DEBUG
     Serial.print("Entire txBuf :");
     for (uint16_t i = 0; i < txBufLen; i++) {
