@@ -65,6 +65,7 @@ uint16_t crc_ccitt_update(uint16_t crc, uint8_t data) {
             (uint8_t)(data >> 4) ^ ((uint16_t)data << 3));
 }
 
+// CRC OFFICIEL DE RH_ASK
 uint16_t RHcrc_ccitt_update (uint16_t crc, uint8_t data)
 {
     data ^= lo8 (crc);
@@ -143,6 +144,25 @@ bool send(const uint8_t* message, uint8_t len) {
     return true;
 }
 
+bool validateTxBuf(uint16_t calculatedCRC) {
+    if (txBufLen < 3) return false;
+    
+    // Calculate CRC over entire buffer
+    uint16_t Newcrc = 0xffff;
+    for (uint8_t i = 0; i < txBufLen; i++) {
+        Newcrc = RHcrc_ccitt_update(Newcrc, txBuf[i]);
+    }
+    Serial.print("Validate TX Buf - Length: ");
+    Serial.print(txBufLen);
+    Serial.print("\nCalculated CRC: ");
+    Serial.print(Newcrc, HEX);
+    Serial.print(" Expected CRC: ");
+    Serial.println(0xf0b8, HEX);
+    
+    // Valid CRC should result in 0xf0b8
+    return (Newcrc == 0xf0b8);
+}
+
 // Timer interrupt - called 8 times per bit
 ISR(TIMER1_COMPA_vect) {
     if (!transmitting) return;
@@ -172,13 +192,13 @@ ISR(TIMER1_COMPA_vect) {
 
 void loop() {
     static uint32_t lastSend = 0;
-    static uint8_t counter = 33;
+    static uint8_t counter = 33; // Pour afficher des carateres ASCII visibles
     
     if (millis() - lastSend >= 1000 && !transmitting) {
         // Send a test message every second
         uint8_t message[10];
         message[0] = 0x42;  // Test pattern
-        if (counter > 124) counter = 33;
+        if (counter > 124) counter = 33; // 124 pour rester dans les caracteres ASCII visibles
         message[1] = counter++;
         
         sprintf((char*)&message[2], "TEST%02d", counter);

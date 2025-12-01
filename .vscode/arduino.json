@@ -1,3 +1,4 @@
 {
-    "port": "COM5"
+    "port": "COM5",
+    "board": "arduino:avr:uno"
 }
