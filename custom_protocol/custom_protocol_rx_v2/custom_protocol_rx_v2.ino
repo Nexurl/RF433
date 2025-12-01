@@ -82,22 +82,19 @@ uint8_t symbol_6to4(uint8_t symbol) {
 // Validate received buffer
 bool validateRxBuf() {
     if (rxBufLen < 3) return false;
-    // Extract received CRC (last two bytes: low byte first, then high byte)
-    uint8_t len = rxBufLen;
-    uint16_t received_crc = rxBuf[len - 2] | (rxBuf[len - 1] << 8);
-    // Calculate CRC over length and data (excluding CRC bytes)
-    uint16_t calc_crc = 0xffff;
-    for (uint8_t i = 0; i < len - 2; i++) {
-        calc_crc = crc_ccitt_update(calc_crc, rxBuf[i]);
+    
+    // Calculate CRC over entire buffer
+    uint16_t crc = 0xffff;
+    for (uint8_t i = 1; i < rxBufLen; i++) {
+        crc = crc_ccitt_update(crc, rxBuf[i]);
     }
-    // Invert calculated CRC (ones' complement)
-    calc_crc = ~calc_crc;
-    Serial.print("Received CRC: ");
-    Serial.println(received_crc, HEX);
-    Serial.print("Calculated CRC: ");
-    Serial.println(calc_crc, HEX);
-    // Valid if calculated CRC matches received CRC
-    return (calc_crc == received_crc);
+    Serial.println();
+    Serial.println(rxBufLen);
+    Serial.println(crc);
+    Serial.println(0xf0b8);
+    
+    // Valid CRC should result in 0xf0b8
+    return (crc == 0xf0b8);
 }
 
 // Timer interrupt - called 8 times per bit
