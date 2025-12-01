@@ -98,29 +98,22 @@ bool send(const uint8_t* message, uint8_t len) {
     txBuf[txBufLen++] = 0x38;
     txBuf[txBufLen++] = 0x2c;
     
-    // Calculate total length: count(1) + message + FCS(2)
-    uint8_t totalLen = len + 3;
-    
+    // Calculate total length: count(1) + message + checksum(1)
+    uint8_t totalLen = len + 2;
     // Encode length
     encodeByte(totalLen);
-    
-    // Calculate CRC
-    uint16_t crc = 0xffff;
-    crc = RHcrc_ccitt_update(crc, totalLen);
-
-    // Encode message
+    // Calculate simple checksum (sum modulo 256)
+    uint8_t checksum = totalLen;
     for (uint8_t i = 0; i < len; i++) {
         encodeByte(message[i]);
-        crc = RHcrc_ccitt_update(crc, message[i]);
+        checksum += message[i];
     }
-    // Invert CRC (ones' complement)
-    crc = ~crc;
-    // Encode CRC (low byte first, then high byte)
-    encodeByte(crc & 0xff);
-    encodeByte(crc >> 8);
+    checksum = checksum & 0xFF;
+    // Encode checksum as last byte
+    encodeByte(checksum);
     // DEBUG
-    Serial.print("CRC :");
-    Serial.print(crc, HEX);
+    Serial.print("Checksum :");
+    Serial.print(checksum, HEX);
     Serial.println();
 
     // Start transmission

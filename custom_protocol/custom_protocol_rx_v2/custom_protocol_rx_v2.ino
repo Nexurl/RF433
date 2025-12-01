@@ -81,20 +81,21 @@ uint8_t symbol_6to4(uint8_t symbol) {
 
 // Validate received buffer
 bool validateRxBuf() {
-    if (rxBufLen < 3) return false;
-    
-    // Calculate CRC over entire buffer
-    uint16_t crc = 0xffff;
-    for (uint8_t i = 1; i < rxBufLen; i++) {
-        crc = crc_ccitt_update(crc, rxBuf[i]);
+    if (rxBufLen < 2) return false;
+    // Extract checksum (last byte)
+    uint8_t received_checksum = rxBuf[rxBufLen - 1];
+    // Calculate sum of all previous bytes modulo 256
+    uint8_t calc_checksum = 0;
+    for (uint8_t i = 0; i < rxBufLen - 1; i++) {
+        calc_checksum += rxBuf[i];
     }
-    Serial.println();
-    Serial.println(rxBufLen);
-    Serial.println(crc);
-    Serial.println(0xf0b8);
-    
-    // Valid CRC should result in 0xf0b8
-    return (crc == 0xf0b8);
+    calc_checksum = calc_checksum & 0xFF;
+    Serial.print("Received checksum: ");
+    Serial.println(received_checksum, HEX);
+    Serial.print("Calculated checksum: ");
+    Serial.println(calc_checksum, HEX);
+    // Valid if calculated checksum matches received checksum
+    return (calc_checksum == received_checksum);
 }
 
 // Timer interrupt - called 8 times per bit
