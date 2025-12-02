@@ -202,8 +202,8 @@ ISR(TIMER1_COMPA_vect) {
                 uint8_t thisByte = (symbol_6to4(rxBits & 0x3f) << 4) | 
                                    symbol_6to4(rxBits >> 6);
                 
-                // Serial.print("byte : ");
-                Serial.print(thisByte, HEX);
+                Serial.print("byte : ");
+                Serial.println(thisByte, HEX);
 
                 if (rxBufLen == 0) {
                     // First byte is the count
@@ -238,6 +238,9 @@ void loop() {
     if (rxBufFull) {
         noInterrupts();
         uint8_t len = rxBufLen;
+        Serial.print("Len = ");
+        Serial.println(len);
+
         uint8_t buf[MAX_PAYLOAD_LEN];
         for (uint8_t i = 0; i < len; i++) {
             buf[i] = rxBuf[i];

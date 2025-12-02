@@ -112,8 +112,8 @@ bool send(const uint8_t* message, uint8_t len) {
     txBuf[txBufLen++] = 0x38;
     txBuf[txBufLen++] = 0x2c;
     
-    // Calculate total length: count(1) + message + checksum(1)
-    uint8_t totalLen = len + 2;
+    // Calculate total length: count(1) + message + rolling count (4) + hash(2) + checksum(1)
+    uint8_t totalLen = len + 8;
     // Encode length
     encodeByte(totalLen);
     // Calculate simple checksum (sum modulo 256)
