@@ -36,10 +36,6 @@ volatile uint8_t rxCount = 0;
 volatile bool rxBufFull = false;
 volatile bool rxBufValid = false;
 
-uint32_t lastRollingCounter = 0;        // Stocke le dernier compteur accepté
-const uint32_t ROLLING_KEY = 0xA5C3F1B7;  // Clé secrète identique au TX
-const uint16_t ROLLING_WINDOW = 200;     // Fenêtre d’acceptation
-
 void setup() {
     Serial.begin(115200);
     pinMode(RX_PIN, INPUT);
@@ -100,71 +96,6 @@ bool validateRxBuf() {
     Serial.println(calc_checksum, HEX);
     // Valid if calculated checksum matches received checksum
     return (calc_checksum == received_checksum);
-}
-
-uint16_t rollingHash(const uint8_t* data, uint8_t len, uint32_t counter) {
-    uint32_t hash = counter ^ ROLLING_KEY;
-
-    for (uint8_t i = 0; i < len; i++) {
-        hash ^= (uint32_t)data[i] << ((i % 4) * 8);
-        hash = (hash << 5) | (hash >> 27); // rotation
-        hash *= 0x45d9f3b;
-    }
-    return (hash ^ (hash >> 16)) & 0xFFFF;
-}
-
-bool validateRollingCode(uint8_t* buf, uint8_t len) {
-    if (len < 7) return false; // Trop court
-
-    // --------- extraction des champs ----------
-    uint8_t dataLen = len - 1;   // -1 pour le checksum classique
-
-    // Structure : [LEN][DATA...][COUNTER32][HASH16][CHECKSUM]
-    // On enlève LEN au début et CHECKSUM à la fin :
-    uint8_t usefulLen = dataLen - 1 - 4 - 2;
-
-    if (usefulLen <= 0) return false;
-
-    uint8_t* dataPtr = &buf[1];               // Données
-    uint8_t* counterPtr = &buf[1 + usefulLen]; // Counter32
-    uint8_t* hashPtr = counterPtr + 4;        // Hash16
-
-    // Reconstruction du counter
-    uint32_t counter = ((uint32_t)counterPtr[0] << 24) |
-                       ((uint32_t)counterPtr[1] << 16) |
-                       ((uint32_t)counterPtr[2] << 8)  |
-                       ((uint32_t)counterPtr[3]);
-
-    uint16_t receivedHash = ((uint16_t)hashPtr[0] << 8) |
-                            ((uint16_t)hashPtr[1]);
-
-    // --------- RÈGLE 1 : Rolling window anti-replay ----------
-    if (counter <= lastRollingCounter) {
-        Serial.println("ROLL: Counter trop faible → REPLAY ATTACK");
-        return false;
-    }
-    if (counter - lastRollingCounter > ROLLING_WINDOW) {
-        Serial.println("ROLL: Counter hors fenêtre");
-        return false;
-    }
-
-    // --------- RÈGLE 2 : Vérification cryptographique ----------
-    uint16_t calcHash = rollingHash(dataPtr, usefulLen, counter);
-
-    Serial.print("ROLL received hash=0x");
-    Serial.print(receivedHash, HEX);
-    Serial.print(" calculated=0x");
-    Serial.println(calcHash, HEX);
-
-    if (calcHash != receivedHash) {
-        Serial.println("ROLL: Authentification FAILED");
-        return false;
-    }
-
-    // OK → mise à jour
-    lastRollingCounter = counter;
-    Serial.println("ROLL: OK (auth + window)");
-    return true;
 }
 
 // Timer interrupt - called 8 times per bit
@@ -247,12 +178,6 @@ void loop() {
         
         // Validate CRC
         if (validateRxBuf()) {
-            if (!validateRollingCode(buf, len)) {
-                Serial.println("Rolling code invalid");
-                return;
-            }
-            Serial.println("Rolling code valid");
-
             Serial.print("Received (");
             Serial.print(len);
             Serial.print(" bytes): ");
