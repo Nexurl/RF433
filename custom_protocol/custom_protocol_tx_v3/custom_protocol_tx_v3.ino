@@ -4,6 +4,7 @@
 
 #include <Arduino.h>
 
+#define RX_PIN 2
 #define TX_PIN 3
 #define EN_TX_PIN 10
 #define SPEED 2000  // bits per second
@@ -24,11 +25,16 @@ const uint8_t symbols[16] = {
 #define MAX_MESSAGE_LEN 60
 
 volatile uint8_t txBuf[256];    // Encoded transmit buffer
+volatile uint8_t txData[256];    // Non-Encoded transmit buffer
 volatile uint16_t txBufLen = 0;
+volatile uint16_t txDataLen = 0;
 volatile uint16_t txIndex = 0;
 volatile uint8_t txBit = 0;
 volatile uint8_t txSample = 0;
 volatile bool transmitting = false;
+
+uint32_t rollingCounter = 1;      // Counter évolutif
+const uint32_t ROLLING_KEY = 0xA5C3F1B7;   // Clé secrète 32 bits TX/RX
 
 void setup() {
     Serial.begin(115200);
@@ -81,6 +87,17 @@ void encodeByte(uint8_t b) {
     txBuf[txBufLen++] = symbols[b & 0x0f];   // Low nybble
 }
 
+uint16_t rollingHash(const uint8_t* data, uint8_t len, uint32_t counter) {
+    uint32_t hash = counter ^ ROLLING_KEY;
+
+    for (uint8_t i = 0; i < len; i++) {
+        hash ^= (uint32_t)data[i] << ((i % 4) * 8);
+        hash = (hash << 5) | (hash >> 27); // rotation gauche
+        hash *= 0x45d9f3b;
+    }
+    return (hash ^ (hash >> 16)) & 0xFFFF;
+}
+
 bool send(const uint8_t* message, uint8_t len) {
     if (transmitting || len > MAX_MESSAGE_LEN) {
         return false;
@@ -88,7 +105,8 @@ bool send(const uint8_t* message, uint8_t len) {
     
     // Build encoded buffer
     txBufLen = 0;
-    
+    txDataLen = 0;
+
     // Preamble: alternating 0x2a (101010)
     for (uint8_t i = 0; i < PREAMBLE_LEN - 2; i++) {
         txBuf[txBufLen++] = 0x2a;
@@ -98,17 +116,65 @@ bool send(const uint8_t* message, uint8_t len) {
     txBuf[txBufLen++] = 0x38;
     txBuf[txBufLen++] = 0x2c;
     
-    // Calculate total length: count(1) + message + checksum(1)
-    uint8_t totalLen = len + 2;
+    // Calculate total length: count(1) + message + rolling count (4) + hash(2) + checksum(1)
+    uint8_t totalLen = len + 8;
     // Encode length
-    encodeByte(totalLen);
+
+    txData[txDataLen++] = totalLen & 0xff;
+    // encodeByte(totalLen);
+
     // Calculate simple checksum (sum modulo 256)
-    uint8_t checksum = totalLen;
+    // uint8_t checksum = totalLen;
     for (uint8_t i = 0; i < len; i++) {
-        encodeByte(message[i]);
-        checksum += message[i];
+        txData[txDataLen++] = message[i] & 0xff;
+        // encodeByte(message[i]);
+        // checksum += message[i];
+    }
+    // checksum = checksum & 0xFF;
+
+    // Ajouter le rollingCounter au buffer
+
+    txData[txDataLen++] = (rollingCounter >> 24) & 0xFF;
+    txData[txDataLen++] = (rollingCounter >> 16) & 0xFF;
+    txData[txDataLen++] = (rollingCounter >> 8) & 0xFF;
+    txData[txDataLen++] = (rollingCounter) & 0xFF;
+    
+    // encodeByte((rollingCounter >> 24) & 0xFF);
+    // encodeByte((rollingCounter >> 16) & 0xFF);
+    // encodeByte((rollingCounter >> 8) & 0xFF);
+    // encodeByte((rollingCounter) & 0xFF);
+
+    // Calcule du hash sécurisé sur le message UTILE (data)
+    uint16_t auth = rollingHash(message, len, rollingCounter);
+
+    // Ajouter le hash
+
+    txData[txDataLen++] = (auth >> 8) & 0xFF;
+    txData[txDataLen++] = auth & 0xFF;
+
+    // encodeByte((auth >> 8) & 0xFF);
+    // encodeByte(auth & 0xFF);
+
+    // Incrémenter le compteur seulement après un envoi réussi
+    rollingCounter++;
+
+    Serial.print("txDataLen : ");
+    Serial.println(txDataLen);
+    Serial.print("totalLen : ");
+    Serial.println(totalLen);
+
+    uint8_t checksum = 0;
+    Serial.print("Entire txData :");
+    for (uint8_t i = 0; i < txDataLen; i++) {
+        Serial.print(txData[i], HEX);
+        Serial.print(" ");
+        checksum += txData[i];
+        encodeByte(txData[i]);
     }
     checksum = checksum & 0xFF;
+    Serial.print(checksum, HEX);
+    Serial.println();
+
     // Encode checksum as last byte
     encodeByte(checksum);
     // DEBUG
@@ -195,15 +261,19 @@ void loop() {
         
         sprintf((char*)&message[2], "TEST%02d", counter);
         
-        char displaymessage[8];
+        char displaymessage[9];
         if (send(message, 8)) {
             // DEBUG
             Serial.print("Sending: ");
-            for (int i = 0; i < 8; i++) {
+            int i = 0;
+            for (i = 0; i < 8; i++) {
                 Serial.print(message[i], HEX);
                 Serial.print(" ");
                 displaymessage[i] = message[i];
+                // Serial.print(displaymessage[i]);
             }
+            displaymessage[i] = '\0';
+
             Serial.print(" | ");
             Serial.print(displaymessage);
             Serial.println();
