@@ -5,6 +5,8 @@
 #include <Arduino.h>
 
 #define RX_PIN 2
+#define TX_PIN 3
+#define EN_TX_PIN 10
 #define lo8(x) ((x)&0xff) 
 #define hi8(x) ((x)>>8)
 
@@ -39,6 +41,12 @@ volatile bool rxBufValid = false;
 void setup() {
     Serial.begin(115200);
     pinMode(RX_PIN, INPUT);
+
+    // Silence the transmitter
+    pinMode(EN_TX_PIN, OUTPUT);
+    pinMode(TX_PIN, OUTPUT);
+    digitalWrite(EN_TX_PIN, LOW);
+    digitalWrite(TX_PIN, LOW);
     
     setupTimer();
     Serial.println("Custom 433MHz RX ready");
