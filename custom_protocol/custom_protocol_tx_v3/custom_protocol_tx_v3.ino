@@ -256,8 +256,7 @@ void loop() {
         uint8_t message[10];
         message[0] = 0x42;  // Test pattern
         if (counter > 124) counter = 33; // 124 pour rester dans les caracteres ASCII visibles
-        message[1] = counter++;
-        
+        message[1] = ++counter;
         sprintf((char*)&message[2], "TEST%02d", counter);
         
         char displaymessage[9];
