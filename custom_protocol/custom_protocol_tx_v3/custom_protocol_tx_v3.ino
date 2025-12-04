@@ -4,6 +4,7 @@
 
 #include <Arduino.h>
 
+#define RX_PIN 2
 #define TX_PIN 3
 #define EN_TX_PIN 10
 #define SPEED 2000  // bits per second

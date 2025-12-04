@@ -2,83 +2,36 @@
 #include <SD.h>
 #include <RCSwitch.h>
 
-// ESP32 SPI pins (adjust if using different SPI bus)
-#define MOSI_PIN 23
-#define MISO_PIN 19
-#define CLK_PIN 18
-#define CS_PIN 5
-
-// RCSwitch pins (avoid GPIO 0 and 3 on ESP32 — they conflict with boot/serial)
-#define RX_PIN 34      // Receiver input pin
-#define TX_PIN 26      // Transmitter data pin
-#define TX_ENABLE_PIN 25  // Transmitter enable pin
-
-const int chipSelect = CS_PIN;
+const int chipSelect = 4;
 
 RCSwitch mySwitch = RCSwitch();
 File myFile;
-int code_count = 0;
 
 void setup() {
-  Serial.begin(115200);
-  
-  // Add delay to let Serial stabilize
-  for(int i = 0; i < 10; i++) {
-    delay(100);
-    Serial.write('.');
-  }
-  Serial.println("\n\nESP32 Starting...");
-  Serial.flush();
-  
-  // Initialize SPI with ESP32 pins
-  Serial.println("Initializing SPI...");
-  SPI.begin(CLK_PIN, MISO_PIN, MOSI_PIN, CS_PIN);
-  pinMode(chipSelect, OUTPUT);
-  digitalWrite(chipSelect, HIGH);
-  delay(100);
-  Serial.println("SPI initialized");
-  Serial.flush();
-  
-  // Initialize RCSwitch after SPI and a delay to let SD stabilize
-  Serial.println("Waiting before RCSwitch init...");
-  delay(500);
-  Serial.flush();
-  
-  Serial.println("Initializing RCSwitch...");
-  // Use GPIO 34 (input-only, no SPI conflict) for receiver
-  // Use GPIO 26 for transmitter data (also safe from SPI)
-  mySwitch.enableReceive(RX_PIN);  // Receiver on GPIO 34
-  delay(100);
-  mySwitch.enableTransmit(TX_PIN);  // Transmitter data on GPIO 26
-  delay(100);
-  // Setup transmitter enable pin
-  pinMode(TX_ENABLE_PIN, OUTPUT);
-  digitalWrite(TX_ENABLE_PIN, LOW);  // Start disabled
-  Serial.println("RCSwitch initialized");
-  Serial.flush();
+  Serial.begin(9600);
+  mySwitch.enableReceive(0);  // Receiver on interrupt 0 => that is pin #2
+  mySwitch.enableTransmit(3);
 
   while (!SD_Init()) {
     Serial.println("Trying again in 10 seconds...");
     delay(10000);
   }
 
-  if (SD.exists("/keys/location.txt")) {
-    send_keys_from_file(SD.open("/keys/location.txt"));
-    SD.remove("/keys/location.txt");
+  if (SD.exists("keys/location.txt")) {
+    send_keys_from_file(SD.open("keys/location.txt"));
+    SD.remove("keys/location.txt");
   }
 
-  if (!SD.exists("/keys")) {
+  if (!SD.exists("key")) {
     Serial.println("Creating keys directory...");
-    SD.mkdir("/keys");
+    SD.mkdir("keys");
   }
 
-  Serial.println("Creating new location.txt file...");
-  File locationFile = SD.open("/keys/location.txt", FILE_WRITE);
+  Serial.println("Creating keys/location.txt file...");
+  File locationFile = SD.open("keys/location.txt", O_WRITE | O_CREAT);
   locationFile.close();
   
-  //SD_PrintDirectory(SD.open("/"), 3);
-
-  code_count = 0;
+  SD_PrintDirectory(SD.open("/"), 2);
 
   Serial.println("Setup complete.");
 }
@@ -101,7 +54,7 @@ void loop() {
     Serial.println(mySwitch.getReceivedProtocol());
 
     // Store the code (including duplicates)
-    storeCode("/keys/location.txt", binaryBuffer);
+    storeCode("keys/location.txt", binaryBuffer);
 
     mySwitch.resetAvailable();
   }
@@ -127,7 +80,7 @@ unsigned long binaryStringToDecimal(const char* binary) {
 }
 
 bool isCodeInFile(const char* filename, const char* codeToCheck) {
-  File file = SD.open(filename, FILE_READ);
+  File file = SD.open(filename, O_READ);
   if (!file) {
     return false;  // File doesn't exist, so code can't be in it
   }
@@ -155,41 +108,21 @@ bool isCodeInFile(const char* filename, const char* codeToCheck) {
 }
 
 void storeCode(const char* filename, const char* code) {
-  // Ensure /keys directory exists
-  if (!SD.exists("/keys")) {
-    Serial.println("Directory /keys does not exist, creating...");
-    if (!SD.mkdir("/keys")) {
-      Serial.println("ERROR: Failed to create /keys directory");
-      return;
-    }
-  }
-  
-  File file = SD.open(filename, FILE_APPEND);
+  File file = SD.open(filename, O_WRITE | O_APPEND);
   if (file) {
     // Write exactly 24 bits
     for(int i = 0; i < 24; i++) {
       file.write(code[i]);
     }
     file.write('\n');  // Single newline character
-    
-    // Flush to ensure data is written immediately
-    file.flush();
-    uint32_t fileSize = file.size();
     file.close();
-
-    code_count++;
     
-    Serial.print("Code #");
-    Serial.print(code_count);
-    Serial.print(" stored in ");
+    Serial.print("Code stored in ");
     Serial.print(filename);
-    Serial.print(" (file size: ");
-    Serial.print(fileSize);
-    Serial.print(" bytes): ");
+    Serial.print(": ");
     Serial.println(code);
   } else {
-    Serial.print("ERROR: Failed to open file for writing: ");
-    Serial.println(filename);
+    Serial.println("Error opening file for writing");
   }
 }
 
@@ -205,9 +138,11 @@ void storeUniqueCode(const char* filename, const char* code) {
 bool SD_Init() {
   Serial.println("\nInitializing SD card...");
 
-  // ESP32: use full SPI pin specification
-  // SD.begin(CS_PIN, SPI, frequency, mount_point, max_open_files)
-  if (!SD.begin(CS_PIN, SPI, 25000000, "/sd", 5)) {
+  // we'll use the initialization code from the utility libraries
+
+  // since we're just testing if the card is working!
+
+  if (!SD.begin(chipSelect)) {
     Serial.println();
     Serial.println("Initialization failed. Things to check:");
     Serial.println("* is a card inserted?");
@@ -258,16 +193,10 @@ void SD_PrintDirectory(File dir, int numTabs) {
 
 void send_keys_from_file(File keyFile) {
   if (keyFile) {
-    // Enable transmitter
-    Serial.println("Enabling transmitter for send_keys_from_file");
-    digitalWrite(TX_ENABLE_PIN, HIGH);  // Enable the module
-    delay(10);
-    
     char buffer[33];  // 32 bits + null terminator
     int bufferIndex = 0;
-    int codesSent = 0;
     
-    Serial.println("Reading and sending codes from location.txt");
+    Serial.println("Reading and sending codes from exemple.txt:");
     
     while (keyFile.available()) {
       char c = keyFile.read();
@@ -275,16 +204,13 @@ void send_keys_from_file(File keyFile) {
       if (c == '\n' || c == '\r') {
         if (bufferIndex > 0) {  // If we have collected some characters
           buffer[bufferIndex] = '\0';  // Null terminate the string
-          Serial.print("Sending code #");
-          Serial.print(codesSent + 1);
-          Serial.print(": ");
+          Serial.print("Sending code: ");
           Serial.println(buffer);
           mySwitch.send(buffer);
-          codesSent++;
           bufferIndex = 0;  // Reset for next line
           delay(1000);  // Wait 1 second between transmissions
         }
-      } else if (bufferIndex < 32) {  // Prevent buffer overflow
+      } else if (bufferIndex < 24) {  // Prevent buffer overflow
         buffer[bufferIndex] = c;
         bufferIndex++;
       }
@@ -293,22 +219,13 @@ void send_keys_from_file(File keyFile) {
     // Handle the last line if it doesn't end with a newline
     if (bufferIndex > 0) {
       buffer[bufferIndex] = '\0';
-      Serial.print("Sending code #");
-      Serial.print(codesSent + 1);
-      Serial.print(": ");
+      Serial.print("Sending code: ");
       Serial.println(buffer);
       mySwitch.send(buffer);
-      codesSent++;
     }
     
     keyFile.close();
-    Serial.print("Finished sending ");
-    Serial.print(codesSent);
-    Serial.println(" code(s).");
-    // Disable transmitter
-    digitalWrite(TX_ENABLE_PIN, LOW);  // Disable the module
-    pinMode(TX_PIN, INPUT);
-    Serial.println("Transmitter disabled");
+    Serial.println("Finished sending all codes.");
   } else {
     Serial.println("Error opening file");
   }
