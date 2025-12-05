@@ -7,6 +7,7 @@
 #define RX_PIN 2
 #define TX_PIN 3
 #define EN_TX_PIN 10
+#define BUTTON_PIN 8
 #define SPEED 2000  // bits per second
 
 // CRC helpers
@@ -42,9 +43,10 @@ void setup() {
     pinMode(EN_TX_PIN, OUTPUT);
     digitalWrite(TX_PIN, LOW);
     digitalWrite(EN_TX_PIN, LOW);
+    pinMode(BUTTON_PIN, INPUT);
     
     setupTimer();
-    Serial.println("Custom 433MHz TX ready");
+    Serial.println("\nCustom 433MHz TX ready\n");
 }
 
 void setupTimer() {
@@ -252,13 +254,12 @@ void loop() {
     static uint32_t lastSend = 0;
     static uint8_t counter = 33; // Pour afficher des carateres ASCII visibles
     
-    if (millis() - lastSend >= 1000 && !transmitting) {
+    if (millis() - lastSend >= 1000 && !transmitting && (digitalRead(BUTTON_PIN) == HIGH)) {
         // Send a test message every second
         uint8_t message[10];
         message[0] = 0x42;  // Test pattern
         if (counter > 124) counter = 33; // 124 pour rester dans les caracteres ASCII visibles
-        message[1] = counter++;
-        
+        message[1] = ++counter;
         sprintf((char*)&message[2], "TEST%02d", counter);
         
         char displaymessage[9];
