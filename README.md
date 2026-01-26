@@ -28,6 +28,7 @@ This repository will only host the code that we need to share between members of
 	- `custom_protocol_tx_v3/` : Transmitter v3 (`custom_protocol_tx_v3.ino`). Rolling-code experiment (TX side), simple checksum and rolling-code injection.
 	- `custom_protocol_rx_v3/` : Receiver v3 (`custom_protocol_rx_v3.ino`). Rolling-code experiment (RX side), extracts and validates rolling code and checksum.
 	- `custom_protocol_transceiver/` : Example transceiver code (both TX and RX in one sketch) where applicable.
+	- `custom_protocol_transceiver_rolling` : Bidirectional rolling code (Work in progress)
 
 - `log_raw_timings/` : Sketch for logging raw timings from a receiver to aid protocol reverse-engineering.
 	- `log_raw_timings.ino`
