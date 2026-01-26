@@ -61,9 +61,9 @@ void loop() {
 }
 
 
-// Convert decimal to binary string (24 bits)
+// Convert decimal to binary string
 void decimalToBinaryString(unsigned long value, char* buffer) {
-  buffer[24] = '\0';  // Null terminate the string
+  buffer[24] = '\0';
   for(int i = 23; i >= 0; i--) {
     buffer[i] = (value & 1) ? '1' : '0';
     value = value >> 1;
@@ -79,24 +79,23 @@ unsigned long binaryStringToDecimal(const char* binary) {
   return result;
 }
 
+// Check if code exists in file
 bool isCodeInFile(const char* filename, const char* codeToCheck) {
   File file = SD.open(filename, O_READ);
   if (!file) {
-    return false;  // File doesn't exist, so code can't be in it
+    return false;
   }
 
-  char buffer[25];  // 24 bits + null terminator
-  buffer[24] = '\0';  // Always null terminate
+  char buffer[25];
+  buffer[24] = '\0';
   
   while (file.available()) {
-    // Read exactly 24 characters
     int bytesRead = file.read((uint8_t*)buffer, 24);
     if (bytesRead == 24) {
       if (strcmp(buffer, codeToCheck) == 0) {
         file.close();
-        return true;  // Found a match
+        return true;
       }
-      // Skip the newline character
       if (file.available()) {
         file.read();
       }
@@ -107,14 +106,14 @@ bool isCodeInFile(const char* filename, const char* codeToCheck) {
   return false;
 }
 
+// Store code to file
 void storeCode(const char* filename, const char* code) {
   File file = SD.open(filename, O_WRITE | O_APPEND);
   if (file) {
-    // Write exactly 24 bits
     for(int i = 0; i < 24; i++) {
       file.write(code[i]);
     }
-    file.write('\n');  // Single newline character
+    file.write('\n');
     file.close();
     
     Serial.print("Code stored in ");
@@ -126,6 +125,7 @@ void storeCode(const char* filename, const char* code) {
   }
 }
 
+// Store code only if it doesn't already exist
 void storeUniqueCode(const char* filename, const char* code) {
   if (!isCodeInFile(filename, code)) {
     storeCode(filename, code);
@@ -135,12 +135,9 @@ void storeUniqueCode(const char* filename, const char* code) {
 }
 
 
+// Initialize SD card
 bool SD_Init() {
   Serial.println("\nInitializing SD card...");
-
-  // we'll use the initialization code from the utility libraries
-
-  // since we're just testing if the card is working!
 
   if (!SD.begin(chipSelect)) {
     Serial.println();
@@ -161,12 +158,12 @@ bool SD_Init() {
   }
 }
 
+// Print directory structure recursively
 void SD_PrintDirectory(File dir, int numTabs) {
   while (true) {
     File entry =  dir.openNextFile();
 
     if (!entry) {
-      // no more files
       break;
     }
 
@@ -181,7 +178,6 @@ void SD_PrintDirectory(File dir, int numTabs) {
       SD_PrintDirectory(entry, numTabs + 1);
 
     } else {
-      // files have sizes, directories do not
       Serial.print("\t\t");
       Serial.println(entry.size(), DEC);
     }
@@ -191,9 +187,10 @@ void SD_PrintDirectory(File dir, int numTabs) {
 
 }
 
+// Send all codes from a file
 void send_keys_from_file(File keyFile) {
   if (keyFile) {
-    char buffer[33];  // 32 bits + null terminator
+    char buffer[33];
     int bufferIndex = 0;
     
     Serial.println("Reading and sending codes from exemple.txt:");
@@ -202,21 +199,20 @@ void send_keys_from_file(File keyFile) {
       char c = keyFile.read();
       
       if (c == '\n' || c == '\r') {
-        if (bufferIndex > 0) {  // If we have collected some characters
-          buffer[bufferIndex] = '\0';  // Null terminate the string
+        if (bufferIndex > 0) {
+          buffer[bufferIndex] = '\0';
           Serial.print("Sending code: ");
           Serial.println(buffer);
           mySwitch.send(buffer);
-          bufferIndex = 0;  // Reset for next line
-          delay(1000);  // Wait 1 second between transmissions
+          bufferIndex = 0;
+          delay(1000);
         }
-      } else if (bufferIndex < 24) {  // Prevent buffer overflow
+      } else if (bufferIndex < 24) {
         buffer[bufferIndex] = c;
         bufferIndex++;
       }
     }
     
-    // Handle the last line if it doesn't end with a newline
     if (bufferIndex > 0) {
       buffer[bufferIndex] = '\0';
       Serial.print("Sending code: ");

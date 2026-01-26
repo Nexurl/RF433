@@ -2,22 +2,22 @@
 #include <SD.h>
 #include <RCSwitch.h>
 
-// ESP32 SPI pins (adjust if using different SPI bus)
+// ESP32 SPI pins
 #define MOSI_PIN 23
 #define MISO_PIN 19
 #define CLK_PIN 18
 #define CS_PIN 5
 
-// RCSwitch pins (avoid GPIO 0 and 3 on ESP32 — they conflict with boot/serial)
-#define RX_PIN 34      // Receiver input pin
-#define TX_PIN 26      // Transmitter data pin
-#define TX_ENABLE_PIN 25  // Transmitter enable pin
+// RCSwitch pins
+#define RX_PIN 34
+#define TX_PIN 26
+#define TX_ENABLE_PIN 25
 
-// Button pins (4 buttons for menu navigation)
-#define BTN_NEXT 12    // Next file
-#define BTN_PREV 13    // Previous file
-#define BTN_SELECT 14  // Select individual code (optional)
-#define BTN_SEND 15    // Send codes from current file
+// Button pins
+#define BTN_NEXT 12
+#define BTN_PREV 13
+#define BTN_SELECT 14
+#define BTN_SEND 15
 
 const int chipSelect = CS_PIN;
 
@@ -26,19 +26,17 @@ File myFile;
 int code_count = 0;
 
 // Menu state
-int currentArchiveIndex = 0;  // 0 = location.txt (current), 1+ = archived files
-int maxArchiveIndex = 0;      // Will be updated when scanning files (max archive number)
-bool menuMode = false;        // Track if we're in menu mode
+int currentArchiveIndex = 0;
+int maxArchiveIndex = 0;
+bool menuMode = false;
 
-// Code selection state
-bool codeSelectionMode = false;  // True = in code selection mode, False = in file selection mode
-int currentCodeIndex = 0;        // Index of currently selected code (0-based)
-int maxCodeIndex = 0;            // Total number of codes in current file - 1
+bool codeSelectionMode = false;
+int currentCodeIndex = 0;
+int maxCodeIndex = 0;
 
 void setup() {
   Serial.begin(115200);
   
-  // Add delay to let Serial stabilize
   for(int i = 0; i < 10; i++) {
     delay(100);
     Serial.write('.');
@@ -46,7 +44,6 @@ void setup() {
   Serial.println("\n\nESP32 Starting...");
   Serial.flush();
   
-  // Initialize button pins
   Serial.println("Initializing buttons...");
   pinMode(BTN_NEXT, INPUT_PULLUP);
   pinMode(BTN_PREV, INPUT_PULLUP);
@@ -55,7 +52,6 @@ void setup() {
   Serial.println("Buttons initialized");
   Serial.flush();
   
-  // Initialize SPI with ESP32 pins
   Serial.println("Initializing SPI...");
   SPI.begin(CLK_PIN, MISO_PIN, MOSI_PIN, CS_PIN);
   pinMode(chipSelect, OUTPUT);
@@ -64,21 +60,17 @@ void setup() {
   Serial.println("SPI initialized");
   Serial.flush();
   
-  // Initialize RCSwitch after SPI and a delay to let SD stabilize
   Serial.println("Waiting before RCSwitch init...");
   delay(500);
   Serial.flush();
   
   Serial.println("Initializing RCSwitch...");
-  // Use GPIO 34 (input-only, no SPI conflict) for receiver
-  // Use GPIO 26 for transmitter data (also safe from SPI)
-  mySwitch.enableReceive(RX_PIN);  // Receiver on GPIO 34
+  mySwitch.enableReceive(RX_PIN);
   delay(100);
-  mySwitch.enableTransmit(TX_PIN);  // Transmitter data on GPIO 26
+  mySwitch.enableTransmit(TX_PIN);
   delay(100);
-  // Setup transmitter enable pin
   pinMode(TX_ENABLE_PIN, OUTPUT);
-  digitalWrite(TX_ENABLE_PIN, LOW);  // Start disabled
+  digitalWrite(TX_ENABLE_PIN, LOW);
   Serial.println("RCSwitch initialized");
   Serial.flush();
 
@@ -87,7 +79,6 @@ void setup() {
     delay(10000);
   }
 
-  // Disabled: No longer send keys on boot
   // if (SD.exists("/keys/location.txt")) {
   //   send_keys_from_file(SD.open("/keys/location.txt"));
   //   SD.remove("/keys/location.txt");
@@ -117,12 +108,10 @@ void setup() {
 }
 
 void loop() {
-  // Check for button presses
   if (menuMode) {
     handleMenuButtons();
   }
   
-  // RF receiver always active
   if (mySwitch.available()) {
     unsigned long decimalValue = mySwitch.getReceivedValue();
     char binaryBuffer[25];  // 24 bits + null terminator
@@ -165,24 +154,23 @@ unsigned long binaryStringToDecimal(const char* binary) {
   return result;
 }
 
+// Check if code exists in file
 bool isCodeInFile(const char* filename, const char* codeToCheck) {
   File file = SD.open(filename, FILE_READ);
   if (!file) {
-    return false;  // File doesn't exist, so code can't be in it
+    return false;
   }
 
-  char buffer[25];  // 24 bits + null terminator
-  buffer[24] = '\0';  // Always null terminate
+  char buffer[25];
+  buffer[24] = '\0'; 
   
   while (file.available()) {
-    // Read exactly 24 characters
     int bytesRead = file.read((uint8_t*)buffer, 24);
     if (bytesRead == 24) {
       if (strcmp(buffer, codeToCheck) == 0) {
         file.close();
-        return true;  // Found a match
+        return true;  
       }
-      // Skip the newline character
       if (file.available()) {
         file.read();
       }
@@ -193,8 +181,8 @@ bool isCodeInFile(const char* filename, const char* codeToCheck) {
   return false;
 }
 
+// Store code to file
 void storeCode(const char* filename, const char* code) {
-  // Ensure /keys directory exists
   if (!SD.exists("/keys")) {
     Serial.println("Directory /keys does not exist, creating...");
     if (!SD.mkdir("/keys")) {
@@ -205,13 +193,10 @@ void storeCode(const char* filename, const char* code) {
   
   File file = SD.open(filename, FILE_APPEND);
   if (file) {
-    // Write exactly 24 bits
     for(int i = 0; i < 24; i++) {
       file.write(code[i]);
     }
-    file.write('\n');  // Single newline character
-    
-    // Flush to ensure data is written immediately
+    file.write('\n');
     file.flush();
     uint32_t fileSize = file.size();
     file.close();
@@ -232,6 +217,7 @@ void storeCode(const char* filename, const char* code) {
   }
 }
 
+// Store code only if it doesn't already exist
 void storeUniqueCode(const char* filename, const char* code) {
   if (!isCodeInFile(filename, code)) {
     storeCode(filename, code);
@@ -240,12 +226,9 @@ void storeUniqueCode(const char* filename, const char* code) {
   }
 }
 
-
+// Initialize SD card
 bool SD_Init() {
   Serial.println("\nInitializing SD card...");
-
-  // ESP32: use full SPI pin specification
-  // SD.begin(CS_PIN, SPI, frequency, mount_point, max_open_files)
   if (!SD.begin(CS_PIN, SPI, 25000000, "/sd", 5)) {
     Serial.println();
     Serial.println("Initialization failed. Things to check:");
@@ -265,6 +248,7 @@ bool SD_Init() {
   }
 }
 
+// Print directory structure recursively
 void SD_PrintDirectory(File dir, int numTabs) {
   while (true) {
     File entry =  dir.openNextFile();
@@ -295,21 +279,20 @@ void SD_PrintDirectory(File dir, int numTabs) {
 
 }
 
+// Send all codes from a file
 void send_keys_from_file(const char* filename) {
-  // Disable RF receiver during transmission
   mySwitch.disableReceive();
   Serial.println("RF receiver disabled for transmission");
   delay(100);
   
   File keyFile = SD.open(filename, FILE_READ);
   if (keyFile) {
-    // Enable transmitter
     Serial.println("Enabling transmitter for send_keys_from_file");
-    pinMode(TX_PIN, OUTPUT);  // Ensure TX pin is in output mode
-    digitalWrite(TX_ENABLE_PIN, HIGH);  // Enable the module
+    pinMode(TX_PIN, OUTPUT);
+    digitalWrite(TX_ENABLE_PIN, HIGH);
     delay(10);
     
-    char buffer[33];  // 32 bits + null terminator
+    char buffer[33];
     int bufferIndex = 0;
     int codesSent = 0;
     
@@ -320,24 +303,23 @@ void send_keys_from_file(const char* filename) {
       char c = keyFile.read();
       
       if (c == '\n' || c == '\r') {
-        if (bufferIndex > 0) {  // If we have collected some characters
-          buffer[bufferIndex] = '\0';  // Null terminate the string
+        if (bufferIndex > 0) {
+          buffer[bufferIndex] = '\0';
           Serial.print("Sending code #");
           Serial.print(codesSent + 1);
           Serial.print(": ");
           Serial.println(buffer);
           mySwitch.send(buffer);
           codesSent++;
-          bufferIndex = 0;  // Reset for next line
-          delay(1000);  // Wait 1 second between transmissions
+          bufferIndex = 0;
+          delay(1000);
         }
-      } else if (bufferIndex < 32) {  // Prevent buffer overflow
+      } else if (bufferIndex < 32) {
         buffer[bufferIndex] = c;
         bufferIndex++;
       }
     }
     
-    // Handle the last line if it doesn't end with a newline
     if (bufferIndex > 0) {
       buffer[bufferIndex] = '\0';
       Serial.print("Sending code #");
@@ -356,25 +338,20 @@ void send_keys_from_file(const char* filename) {
     Serial.println("Error opening file");
   }
   
-  // Disable transmitter
-  digitalWrite(TX_ENABLE_PIN, LOW);  // Disable the module
+  digitalWrite(TX_ENABLE_PIN, LOW);
   delay(100);
   
-  // Re-enable RF receiver after transmission
   mySwitch.enableReceive(RX_PIN);
   Serial.println("RF receiver re-enabled");
 }
 
-// Check if a file is already archived (has a number in the filename)
+// Check if file is already archived
 bool isFileAlreadyArchived(const char* filename) {
-  // Check if filename matches pattern "location_N.txt" where N is a number
   String filenameStr = String(filename);
   if (filenameStr.indexOf("location_") >= 0) {
-    // Extract the part after "location_"
     int underscorePos = filenameStr.indexOf("location_");
     if (underscorePos >= 0) {
-      String afterUnderscore = filenameStr.substring(underscorePos + 9);  // 9 = length of "location_"
-      // Check if it starts with a digit (indicating it's archived as location_N.txt)
+      String afterUnderscore = filenameStr.substring(underscorePos + 9);
       if (afterUnderscore.length() > 0 && isdigit(afterUnderscore[0])) {
         return true;
       }
@@ -383,15 +360,13 @@ bool isFileAlreadyArchived(const char* filename) {
   return false;
 }
 
-// Archive the current location.txt file to the next available numbered archive
+// Archive location.txt to numbered file
 void archiveFile(const char* filename) {
-  // Only archive location.txt, not already-archived files
   if (!String(filename).equals("/keys/location.txt")) {
     Serial.println("ERROR: Can only archive location.txt");
     return;
   }
   
-  // Check if the file has at least one code (minimum 25 bytes)
   File checkFile = SD.open(filename, FILE_READ);
   if (!checkFile) {
     Serial.println("ERROR: Could not open file to check size");
@@ -406,7 +381,6 @@ void archiveFile(const char* filename) {
     return;
   }
   
-  // Find the next available archive number
   int archiveNum = 1;
   String archiveFilename;
   
@@ -420,7 +394,6 @@ void archiveFile(const char* filename) {
   
   archiveFilename = String("/keys/location_") + archiveNum + String(".txt");
   
-  // Copy the file content to the archive
   File sourceFile = SD.open(filename, FILE_READ);
   if (!sourceFile) {
     Serial.println("ERROR: Could not open source file for archiving");
@@ -434,7 +407,6 @@ void archiveFile(const char* filename) {
     return;
   }
   
-  // Copy all bytes from source to archive
   while (sourceFile.available()) {
     byte buffer[64];
     int bytesRead = sourceFile.read(buffer, 64);
@@ -445,7 +417,6 @@ void archiveFile(const char* filename) {
   archiveFileHandle.close();
   sourceFile.close();
   
-  // Delete the original file
   if (SD.remove(filename)) {
     Serial.print("File archived as ");
     Serial.println(archiveFilename.c_str());
@@ -454,7 +425,6 @@ void archiveFile(const char* filename) {
     return;
   }
   
-  // Create a new empty location.txt file
   File newFile = SD.open(filename, FILE_WRITE);
   if (newFile) {
     newFile.close();
@@ -463,11 +433,10 @@ void archiveFile(const char* filename) {
     Serial.println("ERROR: Could not create new location.txt");
   }
   
-  // Rescan for max archive index
   scanMaxArchiveIndex();
 }
 
-// Scan SD card for all archived files and find max index
+// Find maximum archive file number
 void scanMaxArchiveIndex() {
   maxArchiveIndex = 0;
   for (int i = 1; i <= 100; i++) {
@@ -500,7 +469,7 @@ void printMenuStatus() {
   displayFileInfo();
 }
 
-// Display information about the current file
+// Display current file information
 void displayFileInfo() {
   String filename;
   if (currentArchiveIndex == 0) {
@@ -513,7 +482,7 @@ void displayFileInfo() {
     File f = SD.open(filename.c_str(), FILE_READ);
     if (f) {
       uint32_t fileSize = f.size();
-      int numCodes = fileSize / 25;  // Each code is 24 bytes + 1 newline
+      int numCodes = fileSize / 25;
       f.close();
       Serial.print("File: ");
       Serial.print(filename);
@@ -521,12 +490,12 @@ void displayFileInfo() {
       Serial.print(fileSize);
       Serial.print(" bytes | Codes: ");
       Serial.println(numCodes);
-      maxCodeIndex = numCodes - 1;  // Update max code index
+      maxCodeIndex = numCodes - 1;
     }
   }
 }
 
-// Get a specific code from the current file by index
+// Retrieve code at specified index from file
 bool getCodeAtIndex(int index, char* codeBuffer) {
   String filename;
   if (currentArchiveIndex == 0) {
@@ -548,14 +517,12 @@ bool getCodeAtIndex(int index, char* codeBuffer) {
     int bytesRead = f.read((uint8_t*)buffer, 24);
     if (bytesRead == 24) {
       if (codeCount == index) {
-        // Found the code we want
         strncpy(codeBuffer, buffer, 24);
         codeBuffer[24] = '\0';
         f.close();
         return true;
       }
       codeCount++;
-      // Skip the newline
       if (f.available()) {
         f.read();
       }
@@ -566,7 +533,7 @@ bool getCodeAtIndex(int index, char* codeBuffer) {
   return false;
 }
 
-// Display current code in selection mode
+// Display current code selection
 void displayCodeSelectionStatus() {
   char code[25];
   if (getCodeAtIndex(currentCodeIndex, code)) {
@@ -581,14 +548,12 @@ void displayCodeSelectionStatus() {
   }
 }
 
-// Send a single code
+// Transmit a single code
 void sendSingleCode(const char* code) {
-  // Disable RF receiver during transmission
   mySwitch.disableReceive();
   Serial.println("RF receiver disabled for transmission");
   delay(100);
   
-  // Enable transmitter
   Serial.println("Enabling transmitter");
   pinMode(TX_PIN, OUTPUT);
   digitalWrite(TX_ENABLE_PIN, HIGH);
@@ -599,51 +564,43 @@ void sendSingleCode(const char* code) {
   mySwitch.send(code);
   delay(1000);
   
-  // Disable transmitter
   digitalWrite(TX_ENABLE_PIN, LOW);
   delay(100);
   
   Serial.println("Code sent");
   
-  // Re-enable RF receiver
   mySwitch.enableReceive(RX_PIN);
   Serial.println("RF receiver re-enabled");
 }
 
-// Handle button presses
+// Process button input and navigate menus
 void handleMenuButtons() {
-  // Debounce delay (20ms is good for button debouncing)
   static unsigned long lastButtonTime = 0;
   static unsigned long selectButtonPressTime = 0;
   static bool selectButtonPressed = false;
   unsigned long currentTime = millis();
   
   if (currentTime - lastButtonTime < 50) {
-    return;  // Debounce
+    return;
   }
   
-  // Check PREV button
   if (digitalRead(BTN_PREV) == LOW) {
     lastButtonTime = currentTime;
     
     if (codeSelectionMode) {
-      // In code selection mode: navigate to previous code
       if (currentCodeIndex > 0) {
         currentCodeIndex--;
         displayCodeSelectionStatus();
       } else if (maxCodeIndex > 0) {
-        // Wrap around to last code
         currentCodeIndex = maxCodeIndex;
         displayCodeSelectionStatus();
       }
     } else {
-      // In file selection mode: navigate to previous file
       if (currentArchiveIndex > 0) {
         currentArchiveIndex--;
-        currentCodeIndex = 0;  // Reset code index when changing files
+        currentCodeIndex = 0;
         printMenuStatus();
       } else if (maxArchiveIndex > 0) {
-        // Wrap around to the last archive
         currentArchiveIndex = maxArchiveIndex;
         currentCodeIndex = 0;
         printMenuStatus();
@@ -655,28 +612,23 @@ void handleMenuButtons() {
     return;
   }
   
-  // Check NEXT button
   if (digitalRead(BTN_NEXT) == LOW) {
     lastButtonTime = currentTime;
     
     if (codeSelectionMode) {
-      // In code selection mode: navigate to next code
       if (currentCodeIndex < maxCodeIndex) {
         currentCodeIndex++;
         displayCodeSelectionStatus();
       } else if (maxCodeIndex > 0) {
-        // Wrap around to first code
         currentCodeIndex = 0;
         displayCodeSelectionStatus();
       }
     } else {
-      // In file selection mode: navigate to next file
       if (currentArchiveIndex < maxArchiveIndex) {
         currentArchiveIndex++;
         currentCodeIndex = 0;
         printMenuStatus();
       } else if (currentArchiveIndex == maxArchiveIndex) {
-        // Wrap around to location.txt
         currentArchiveIndex = 0;
         currentCodeIndex = 0;
         printMenuStatus();
@@ -688,19 +640,16 @@ void handleMenuButtons() {
     return;
   }
   
-  // Check SEND button
   if (digitalRead(BTN_SEND) == LOW) {
     lastButtonTime = currentTime;
     
     if (codeSelectionMode) {
-      // In code selection mode: send the selected code
       char code[25];
       if (getCodeAtIndex(currentCodeIndex, code)) {
         sendSingleCode(code);
         displayCodeSelectionStatus();
       }
     } else {
-      // In file selection mode: send all codes from file
       String filename;
       if (currentArchiveIndex == 0) {
         filename = "/keys/location.txt";
@@ -710,7 +659,6 @@ void handleMenuButtons() {
       Serial.print("Sending all codes from ");
       Serial.println(filename);
       
-      // Check if file exists
       if (SD.exists(filename.c_str())) {
         send_keys_from_file(filename.c_str());
         printMenuStatus();
@@ -723,49 +671,39 @@ void handleMenuButtons() {
     return;
   }
   
-  // Check SELECT button (short press toggles mode, long press archives)
   if (digitalRead(BTN_SELECT) == LOW) {
     if (!selectButtonPressed) {
-      // Button just pressed
       selectButtonPressed = true;
       selectButtonPressTime = currentTime;
     } else {
-      // Button is still held, check for long press (1000ms = 1 second)
       if (currentTime - selectButtonPressTime >= 1000) {
         lastButtonTime = currentTime;
         
-        // Long press: Always archive location.txt, regardless of mode
         Serial.println("Long press detected - archiving location.txt");
         archiveFile("/keys/location.txt");
-        // Exit code selection mode if we were in it
         codeSelectionMode = false;
         currentCodeIndex = 0;
-        // If we were on location.txt (index 0), stay there
         if (currentArchiveIndex != 0) {
           currentArchiveIndex = 0;
         }
         printMenuStatus();
         
         selectButtonPressed = false;
-        delay(500);  // Prevent rapid re-triggers
+        delay(500);
         return;
       }
     }
   } else {
-    // Button released
     if (selectButtonPressed) {
-      // It was a short press (less than 1000ms)
       unsigned long pressDuration = currentTime - selectButtonPressTime;
       if (pressDuration < 1000) {
         lastButtonTime = currentTime;
         
         if (codeSelectionMode) {
-          // Short press in code selection mode: return to file selection
           codeSelectionMode = false;
           currentCodeIndex = 0;
           printMenuStatus();
         } else {
-          // Short press in file selection mode: enter code selection mode
           codeSelectionMode = true;
           currentCodeIndex = 0;
           displayCodeSelectionStatus();
