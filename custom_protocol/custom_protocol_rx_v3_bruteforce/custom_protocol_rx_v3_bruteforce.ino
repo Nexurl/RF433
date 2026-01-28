@@ -101,6 +101,7 @@ uint16_t rollingHash(const uint8_t* data, uint8_t len, uint32_t counter, uint32_
 }
 
 bool bruteForceRollingKey(uint8_t* buf, uint8_t len, uint32_t* foundKeyOut, uint32_t* foundCounterOut) {
+    Serial.println("\nStarting to bruteforce rolling key");
     if (len < 7) return false;
     uint8_t dataLen = len - 1;
     uint8_t usefulLen = dataLen - 1 - 4 - 2;
@@ -115,7 +116,7 @@ bool bruteForceRollingKey(uint8_t* buf, uint8_t len, uint32_t* foundKeyOut, uint
     uint16_t receivedHash = ((uint16_t)hashPtr[0] << 8) |
                             ((uint16_t)hashPtr[1]);
     // Try a limited brute force range for demo (e.g. 0xA5C3F000 to 0xA5C3FFFF)
-    for (uint32_t key = 0xA5C3F000; key <= 0xA5C3FFFF; key++) {
+    for (uint32_t key = 0xA5C30000; key <= 0xA5C3FFFF; key++) {
         uint16_t calcHash = rollingHash(dataPtr, usefulLen, counter, key);
         if (calcHash == receivedHash) {
             *foundKeyOut = key;
