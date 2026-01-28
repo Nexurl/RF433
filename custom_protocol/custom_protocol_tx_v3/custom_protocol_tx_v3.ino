@@ -65,24 +65,6 @@ void setupTimer() {
     interrupts();
 }
 
-// CRC-CCITT calculation
-uint16_t crc_ccitt_update(uint16_t crc, uint8_t data) {
-    data ^= crc & 0xff;
-    data ^= data << 4;
-    return ((((uint16_t)data << 8) | ((crc >> 8) & 0xff)) ^
-            (uint8_t)(data >> 4) ^ ((uint16_t)data << 3));
-}
-
-// CRC OFFICIEL DE RH_ASK
-uint16_t RHcrc_ccitt_update (uint16_t crc, uint8_t data)
-{
-    data ^= lo8 (crc);
-    data ^= data << 4;
-    
-    return ((((uint16_t)data << 8) | hi8 (crc)) ^ (uint8_t)(data >> 4) 
-	    ^ ((uint16_t)data << 3));
-}
-
 // Encode a byte as two 6-bit symbols
 void encodeByte(uint8_t b) {
     txBuf[txBufLen++] = symbols[b >> 4];     // High nybble
@@ -202,25 +184,6 @@ bool send(const uint8_t* message, uint8_t len) {
     Serial.println();
 
     return true;
-}
-
-bool validateTxBuf(uint16_t calculatedCRC) {
-    if (txBufLen < 3) return false;
-    
-    // Calculate CRC over entire buffer
-    uint16_t Newcrc = 0xffff;
-    for (uint8_t i = 0; i < txBufLen; i++) {
-        Newcrc = RHcrc_ccitt_update(Newcrc, txBuf[i]);
-    }
-    Serial.print("Validate TX Buf - Length: ");
-    Serial.print(txBufLen);
-    Serial.print("\nCalculated CRC: ");
-    Serial.print(Newcrc, HEX);
-    Serial.print(" Expected CRC: ");
-    Serial.println(0xf0b8, HEX);
-    
-    // Valid CRC should result in 0xf0b8
-    return (Newcrc == 0xf0b8);
 }
 
 // Timer interrupt - called 8 times per bit
