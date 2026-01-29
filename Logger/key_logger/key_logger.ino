@@ -14,8 +14,8 @@
 #define TX_ENABLE_PIN 25
 
 // Button pins
-#define BTN_NEXT 12
-#define BTN_PREV 13
+#define BTN_NEXT 13
+#define BTN_PREV 12
 #define BTN_SELECT 14
 #define BTN_SEND 15
 
@@ -118,7 +118,7 @@ void loop() {
     
     decimalToBinaryString(decimalValue, binaryBuffer);
     
-    Serial.print("Received Decimal: ");
+    Serial.print("\nReceived Decimal: ");
     Serial.print(decimalValue);
     Serial.print(" / Binary: ");
     Serial.print(binaryBuffer);
@@ -128,8 +128,8 @@ void loop() {
     Serial.print("Protocol: ");
     Serial.println(mySwitch.getReceivedProtocol());
 
-    // Store the code (including duplicates)
-    storeCode("/keys/location.txt", binaryBuffer);
+    // Store the code only if it doesn't already exist
+    storeUniqueCode("/keys/location.txt", binaryBuffer);
 
     mySwitch.resetAvailable();
   }
@@ -454,7 +454,7 @@ void scanMaxArchiveIndex() {
 
 // Print current menu status
 void printMenuStatus() {
-  Serial.println("=== MENU ===");
+  Serial.println("\n=== MENU ===");
   Serial.print("File: ");
   if (currentArchiveIndex == 0) {
     Serial.println("location.txt (current)");
@@ -463,15 +463,18 @@ void printMenuStatus() {
     Serial.print(currentArchiveIndex);
     Serial.println(".txt");
   }
-  Serial.println("BTN_PREV: Previous | BTN_NEXT: Next | BTN_SEND: Send | BTN_SELECT: Info");
-  
   // Display file info
   displayFileInfo();
+
+  Serial.println("BTN_SEND: Send all codes | BTN_SELECT: Select Mode / (Hold) Archive | BTN_PREV: Previous | BTN_NEXT: Next");
+  
+  
 }
 
 // Display current file information
 void displayFileInfo() {
   String filename;
+  
   if (currentArchiveIndex == 0) {
     filename = "/keys/location.txt";
   } else {
@@ -484,9 +487,9 @@ void displayFileInfo() {
       uint32_t fileSize = f.size();
       int numCodes = fileSize / 25;
       f.close();
-      Serial.print("File: ");
-      Serial.print(filename);
-      Serial.print(" | Size: ");
+      //Serial.print("Info: ");
+      //Serial.print(filename);
+      Serial.print("Size: ");
       Serial.print(fileSize);
       Serial.print(" bytes | Codes: ");
       Serial.println(numCodes);
@@ -537,14 +540,14 @@ bool getCodeAtIndex(int index, char* codeBuffer) {
 void displayCodeSelectionStatus() {
   char code[25];
   if (getCodeAtIndex(currentCodeIndex, code)) {
-    Serial.println("=== CODE SELECTION MODE ===");
+    Serial.println("\n=== SINGLE CODE SELECTION MODE ===");
     Serial.print("Code ");
     Serial.print(currentCodeIndex + 1);
     Serial.print("/");
     Serial.print(maxCodeIndex + 1);
     Serial.print(": ");
     Serial.println(code);
-    Serial.println("BTN_PREV: Previous Code | BTN_NEXT: Next Code | BTN_SEND: Send This Code | BTN_SELECT: Back to File");
+    Serial.println("BTN_SEND: Send Code | BTN_SELECT: File Mode | BTN_PREV: Previous Code | BTN_NEXT: Next Code");
   }
 }
 
@@ -679,7 +682,7 @@ void handleMenuButtons() {
       if (currentTime - selectButtonPressTime >= 1000) {
         lastButtonTime = currentTime;
         
-        Serial.println("Long press detected - archiving location.txt");
+        Serial.println("\nLong press detected - archiving location.txt");
         archiveFile("/keys/location.txt");
         codeSelectionMode = false;
         currentCodeIndex = 0;
